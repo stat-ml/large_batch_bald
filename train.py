@@ -402,7 +402,7 @@ for random_seed in random_seeds:
             added_indices.append(dataset_indices)
             pbar.update(len(dataset_indices))
             
-            if random_seed == random_seeds[0] and len(active_learning_data.training_dataset) % 2 == 0:
+            if len(active_learning_data.training_dataset) % 50 == 0:
                 plt.clf()
                 plt.imshow(np.transpose(image_candidate[0].cpu().detach().numpy(), (1, 2, 0)))
                 plt.savefig(PATH + "/example_candidate_" + alg + str(random_seed) + "_" \
