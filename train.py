@@ -396,17 +396,17 @@ for random_seed in random_seeds:
             print("Scores: ", candidate_batch.scores)
             print("Labels: ", targets[candidate_batch.indices])
 
-            image_candidate = np.array(active_learning_data.pool_dataset)[candidate_batch.indices][0]
+            image_candidate = np.array(active_learning_data.pool_dataset)[candidate_batch.indices]
             
             active_learning_data.acquire(candidate_batch.indices)
             added_indices.append(dataset_indices)
             pbar.update(len(dataset_indices))
             
-            if len(active_learning_data.training_dataset) % 50 == 0:
+            for i in range(image_candidate.shape[0]):
                 plt.clf()
-                plt.imshow(np.transpose(image_candidate[0].cpu().detach().numpy(), (1, 2, 0)))
-                plt.savefig(PATH + "/example_candidate_" + alg + str(random_seed) + "_" \
-                            + str(len(active_learning_data.training_dataset)) + "_" + str(image_candidate[1]))
+                plt.imshow(np.transpose(image_candidate[i][0].cpu().detach().numpy(), (1, 2, 0)))
+                plt.savefig(PATH + "/example_candidate_" + alg + str(i) + "_" \
+                            + str(len(active_learning_data.training_dataset)) + "_" + str(image_candidate[i][1]))
 
             
             

@@ -2,10 +2,11 @@
 #
 #SBATCH -o test_run_%j
 #SBATCH --ntasks=1
-#SBATCH --partition gpu_small
+#SBATCH --partition gpu_devel
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=d.kotova@skoltech.ru
 #
+#SBATCH --time=3:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu
 #SBATCH --mem=20G
