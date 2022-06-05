@@ -1,7 +1,3 @@
-Large Batch BALD (LBB)
-
-Exploring scalability of active learning
-
 # BatchBALD Redux
 > Clean reimplementation of \"BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian Active Learning\"
 
@@ -13,7 +9,7 @@ The original implementation used in the paper is available at https://github.com
 We are grateful for fastai's [nbdev](https://nbdev.fast.ai/) which is powering this package.
 
 For more information, explore the sections and notebooks in the left-hand menu.
-The code is available on https://github.com/BlackHC/batchbald_redux,
+The code is available on https://github.com/BlackHC/batchbald_redux, 
 and the website on https://blackhc.github.io/batchbald_redux.
 
 ## Install
@@ -30,7 +26,7 @@ The aquisition function is the mutual information between the joint of a candida
 $$a_{\text{BatchBALD}}((y_b)_B) = I[(y_b)_B;\omega]$$
 {% endraw %}
 
-The best candidate batch is one that maximizes this acquisition function.
+The best candidate batch is one that maximizes this acquisition function. 
 
 In the paper, we show that this function satisfies sub-modularity, which provides us an optimality guarantee for a greedy algorithm. The candidate batch is selected using greedy expansion.
 
@@ -53,7 +49,7 @@ To aid reproducibility and baseline reproduction, we provide this simpler and cl
 
 ## How to use
 
-We provide a simple example experiment that uses this package [here](https://blackhc.github.io/batchbald_redux/example_experiment/).
+We provide a simple example experiment that uses this package [here](https://blackhc.github.io/batchbald_redux/example_experiment/). 
 
 To get a candidate batch using BatchBALD, we provide a simple API in [`batchbald_redux.batchbald`](https://blackhc.github.io/batchbald_redux/batchbald/):
 

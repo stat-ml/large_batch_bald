@@ -25,8 +25,6 @@ def plot_graph(PATH, algs, uns_type, dataset, acquisition_batch_size, random_see
     
     for alg in algs:
         df = pd.read_csv('results/' + uns_type + "/" + dataset + "/" + str(acquisition_batch_size) + "/" + alg + str(random_seed) + ".csv")
-        print("x: ", np.arange(num_initial_samples, max_training_samples + acquisition_batch_size - 1, acquisition_batch_size))
-        print("y: ", df['Test accuracy'])
         plt.plot(np.arange(num_initial_samples, max_training_samples + acquisition_batch_size - 1, acquisition_batch_size), df['Test accuracy'], alg_colors[alg], label=alg, linewidth=7.0)
     
     plt.xlabel("Number of training samples")
