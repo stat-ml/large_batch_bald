@@ -32,6 +32,7 @@ from batchbald_redux import (
     cifar10,
     repeated_cifar10,
     cifar100,
+    repeated_cifar100,
     svhn
 )
 
@@ -125,6 +126,12 @@ elif dataset_name == 'CIFAR100':
     num_classes = 100
     initial_samples = active_learning.get_balanced_sample_indices(
     cifar100.get_targets(train_dataset), num_classes=num_classes, n_per_digit=num_initial_samples / num_classes
+)
+elif dataset_name == 'RCIFAR100':
+    train_dataset, test_dataset = repeated_cifar100.create_repeated_CIFAR100_dataset(num_repetitions=4, add_noise=False)
+    num_classes = 100
+    initial_samples = active_learning.get_balanced_sample_indices(
+    repeated_cifar10.get_targets(train_dataset), num_classes=num_classes, n_per_digit=num_initial_samples / num_classes
 )
 elif dataset_name == 'SVHN':
     train_dataset, test_dataset = svhn.create_SVHN_dataset()
@@ -576,7 +583,9 @@ for random_seed in random_seeds:
             elif dataset_name == 'MNIST' or dataset_name == 'RMNIST':
                 targets = repeated_mnist.get_targets(active_learning_data.pool_dataset)
             elif dataset_name == 'RCIFAR10':
-                targets = repeated_cifar10.get_targets(active_learning_data.pool_dataset)    
+                targets = repeated_cifar10.get_targets(active_learning_data.pool_dataset) 
+            elif dataset_name == 'RCIFAR100':
+                targets = repeated_cifar100.get_targets(active_learning_data.pool_dataset) 
             dataset_indices = active_learning_data.get_dataset_indices(candidate_batch.indices)
 
             print("Dataset indices: ", dataset_indices)
