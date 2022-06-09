@@ -30,7 +30,8 @@ from batchbald_redux import (
     fmnist,
     cifar10,
     cifar100,
-    svhn
+    svhn,
+    kmnist
 )
 
 from cnn_models import (
@@ -113,6 +114,12 @@ elif dataset_name == 'SVHN':
     num_classes = 10
     initial_samples = active_learning.get_balanced_sample_indices(
     svhn.get_targets(train_dataset), num_classes=num_classes, n_per_digit=num_initial_samples / num_classes
+)
+if dataset_name == 'KMNIST':
+    train_dataset, test_dataset = kmnist.create_KMNIST_dataset()
+    num_classes = 10
+    initial_samples = active_learning.get_balanced_sample_indices(
+    kmnist.get_targets(train_dataset), num_classes=num_classes, n_per_digit=num_initial_samples / num_classes
 )
 algs = args.algs
 
@@ -381,7 +388,7 @@ for random_seed in random_seeds:
                     )
                 elif alg == 'PBALD': 
                     candidate_batch = batchbald.get_powerbald_batch(
-                        logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device
+                        logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device, alpha=5
                     )
                 end = time.perf_counter()
                 print("acquisition time (sec.):", end - start)
@@ -397,6 +404,8 @@ for random_seed in random_seeds:
                 targets = svhn.get_targets(active_learning_data.pool_dataset)
             elif dataset_name == 'MNIST' or dataset_name == 'RMNIST':
                 targets = repeated_mnist.get_targets(active_learning_data.pool_dataset)
+            elif dataset_name == 'KMNIST':
+                targets = kmnist.get_targets(active_learning_data.pool_dataset)
             dataset_indices = active_learning_data.get_dataset_indices(candidate_batch.indices)
 
             print("Dataset indices: ", dataset_indices)
