@@ -11,14 +11,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 import math
+import copy
 from argparse import ArgumentParser
 
 import torch
 from torch.nn import functional as F
 import torchvision
+from torch.utils.data import SubsetRandomSampler
 
 from batchbald_redux import (
-    active_learning,
+    progr_active_learning as active_learning,
     batchbald,
     consistent_mc_dropout,
     joint_entropy,
@@ -48,19 +50,25 @@ parser.add_argument('--model_name', type=str, default='CNN_ENS_RMNIST')
 parser.add_argument('--optimizer_name', type=str, default='Adam')
 parser.add_argument('--uns_type', type=str, default='ENS')
 parser.add_argument('--algs', nargs='+', type=str, default=['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB'])
-parser.add_argument('--random_seeds', nargs='+', type=int, default=[227, 346])#, 684, 920]) # 42, 227, 346, 684, 920 
-parser.add_argument('--num_models', type=int, default=5)
+parser.add_argument('--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920]) # 42, 227, 346, 684, 920 
+parser.add_argument('--num_models', type=int, default=5) # 5, 10
 parser.add_argument('--num_init_samples', type=int, default=200)
 parser.add_argument('--max_train_samples', type=int, default=10000)
 parser.add_argument('--acq_batch_size', type=int, default=100)
-parser.add_argument('--train_batch_size', type=int, default=64) # 64
-parser.add_argument('--pool_batch_size', type=int, default=128)
-parser.add_argument('--test_batch_size', type=int, default=512)
+parser.add_argument('--train_batch_size', type=int, default=50) # 64
+parser.add_argument('--pool_batch_size', type=int, default=100)
+parser.add_argument('--test_batch_size', type=int, default=250) # 512
 parser.add_argument('--num_train_inference_samples', type=int, default=100)
 parser.add_argument('--num_test_inference_samples', type=int, default=5)
 parser.add_argument('--num_samples', type=int, default=100000)
+parser.add_argument('--num_epochs', type=int, default=50)
 parser.add_argument('--training_iterations', type=int, default=24576) # 4096*6
+parser.add_argument('--pool_iterations', type=int, default=8192) # 4096*6 # 20480
 parser.add_argument('--cuda_number', type=int, default=0)
+parser.add_argument('--dropout_rate', type=float, default=0.3)
+parser.add_argument('--val_size', type=int, default=5000)
+parser.add_argument('--lr', type=float, default=0.001)
+parser.add_argument('--patience_threshold', type=int, default=10)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -125,12 +133,15 @@ test_batch_size = args.test_batch_size
 batch_size = args.train_batch_size
 scoring_batch_size = args.pool_batch_size
 training_iterations = args.training_iterations
+pool_iterations = args.pool_iterations
 
 T = args.num_models
 cuda_number = args.cuda_number
 
 start = torch.cuda.Event(enable_timing=True)
 end = torch.cuda.Event(enable_timing=True)
+
+epochs = args.num_epochs
 
 config = {
     'model': model_name,
@@ -180,14 +191,43 @@ for random_seed in random_seeds:
 
         train_loader = torch.utils.data.DataLoader(
             active_learning_data.training_dataset,
-            sampler=active_learning.RandomFixedLengthSampler(active_learning_data.training_dataset, training_iterations),
+            shuffle=True,
+#             sampler=active_learning.RandomFixedLengthSampler(active_learning_data.training_dataset, training_iterations),
             batch_size=batch_size,
             **kwargs,
         )
-
-        pool_loader = torch.utils.data.DataLoader(
-            active_learning_data.pool_dataset, batch_size=scoring_batch_size, shuffle=False, **kwargs
+    
+        val_indeces = random.sample(range(0, len(active_learning_data.pool_dataset)), args.val_size)
+        active_learning_data.val_acquire(val_indeces)
+#         val_set = torch.utils.data.Subset(active_learning_data.pool_dataset, val_indeces)
+        val_loader = torch.utils.data.DataLoader(
+            active_learning_data.val_dataset,
+            batch_size=batch_size,
+            **kwargs,
         )
+        
+#         active_learning_data.pool_dataset = active_learning_data.remove_from_pool(val_indeces)
+
+#         pool_sampler = SubsetRandomSampler()
+        # write more careful
+        pool_loader = torch.utils.data.DataLoader(
+            active_learning_data.pool_dataset,
+            batch_size=scoring_batch_size,
+            shuffle=False,
+            sampler=active_learning.RandomFixedLengthSampler(active_learning_data.pool_dataset, pool_iterations),
+            **kwargs
+        )
+#         print("pool data:", len(pool_loader.dataset))
+
+#         def append_dropout(model, rate=0.2):
+#             for name, module in model.named_children():
+#                 if len(list(module.children())) > 0:
+#                     append_dropout(module)
+#                 if isinstance(module, torch.nn.ReLU):
+#                     new = torch.nn.Sequential(module, torch.nn.Dropout2d(p=rate))
+#                     setattr(model, name, new)
+
+
 
         # Run experiment
         test_accs = []
@@ -195,10 +235,7 @@ for random_seed in random_seeds:
         added_indices = []
 
         pbar = tqdm(initial=len(active_learning_data.training_dataset), total=max_training_samples, desc="Training Set Size")
-        
-        targets = None
-        dataset_indices = None
-        
+
         while True:
             if uns_type == 'MC':
                 T = 1
@@ -216,39 +253,132 @@ for random_seed in random_seeds:
                     model = CNN_ENS_RMNIST(num_classes).to(device=device)
                 elif model_name == 'ResNet-18':
                     model = torchvision.models.resnet18(pretrained=False, num_classes=num_classes).to(device=device)
+#                     append_dropout(model) ###
+#                     model = torchvision.models.resnet152(pretrained=False, num_classes=num_classes).to(device=device)
                 elif model_name == 'ResNet-20':
                     model = resnet20().to(device=device)
+                elif model_name == 'VGG-16':
+                    model = torchvision.models.vgg16(pretrained=False, num_classes=num_classes).to(device=device)
+                elif model_name == 'DenseNet-121':
+#                     model = torchvision.models.densenet121(growth_rate=12, pretrained=False, num_classes=num_classes, drop_rate=0.2).to(device=device)
+                    model = torchvision.models.densenet121(pretrained=False, num_classes=num_classes, drop_rate=args.dropout_rate).to(device=device)
                 model.apply(init_glorot)
                 if optimizer_name == 'Adam':
-                    optimizer = torch.optim.Adam(model.parameters())
+                    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr) # 0.001
+#                     optimizer = torch.optim.Adam(model.parameters(), 0.01, weight_decay=1e-4)
+#                     sched = torch.optim.lr_scheduler.OneCycleLR(optimizer, 0.01, epochs=epochs, 
+#                                                 steps_per_epoch=len(train_loader))
                 elif optimizer_name == 'SGD':
-                    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
-
+#                     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+                    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0005) #
+#                     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+                
+                patience = 0
+                prev_loss = 10e8
+                best_loss = 10e8
+    
                 model.train()
+                
+                for epoch in range(epochs):
+#                     print("epoch:", epoch)
+                    while patience < args.patience_threshold:
+                        correct = 0
+                        epoch_loss = 0.0
 
-                # Train
-                for data, target in tqdm(train_loader, desc="Training", leave=False):
-                    data = data.to(device=device)
-                    target = target.to(device=device)
+                        # Train
+                        for data, target in tqdm(train_loader, desc="Training", leave=False):
+                            data = data.to(device=device)
+                            target = target.to(device=device)
 
-                    optimizer.zero_grad()
-                    if model_name == 'ResNet-18' or model_name == 'ResNet-20':
-                        if uns_type == 'MC':
-                            prediction = torch.log_softmax(model(data, 1).squeeze(1), dim=1)
-                        elif uns_type == 'ENS':
-                            prediction = torch.log_softmax(model(data), dim=1)
-                    else:
-                        if uns_type == 'MC':
-                            prediction = model(data, 1).squeeze(1)
-                        elif uns_type == 'ENS':
-                            prediction = model(data)
-                  
-                    loss = F.nll_loss(prediction, target)
+                            optimizer.zero_grad()
+                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
+                                if uns_type == 'MC':
+                                    prediction = torch.log_softmax(model(data, 1).squeeze(1), dim=1)
+                                elif uns_type == 'ENS':
+                                    prediction = torch.log_softmax(model(data), dim=1)
+                            else:
+                                if uns_type == 'MC':
+                                    prediction = model(data, 1).squeeze(1)
+                                elif uns_type == 'ENS':
+                                    prediction = model(data)
 
-                    loss.backward()
-                    optimizer.step()
+                            loss = F.nll_loss(prediction, target)
 
-                models.append(model)
+                            loss.backward()
+                            optimizer.step()
+    #                         sched.step() ###
+    #                         print("train prediction raw:", prediction.shape)
+                            epoch_loss += loss.item()
+
+                            prediction = prediction.max(1)[1] # max indeces
+                            correct += prediction.eq(target.view_as(prediction)).sum().item()
+
+    #                         print("train prediction.max(1)[1]:", prediction.shape)
+    #                         print("train target:", target)
+
+                        train_percentage_correct = 100.0 * correct / len(train_loader.dataset)
+                        epoch_loss /= len(train_loader.dataset)
+                        print("epoch_loss:", epoch_loss)
+
+                        print(
+                            "Train set: Accuracy: {}/{} ({:.2f}%)".format(
+                                correct, len(train_loader.dataset), train_percentage_correct
+                            )
+                        )
+
+                        val_loss = 0
+                        correct = 0
+                        with torch.no_grad():
+                            for data, target in tqdm(val_loader, desc="val", leave=False):
+                                data = data.to(device=device)
+                                target = target.to(device=device)
+    #                             print("model(data):", model(data))
+
+                                if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
+                                    if uns_type == 'MC':
+                                        prediction = torch.log_softmax(model(data, 1).squeeze(1), dim=1)
+                                    elif uns_type == 'ENS':
+                                        prediction = torch.log_softmax(model(data), dim=1)
+                                else:
+                                    if uns_type == 'MC':
+                                        prediction = model(data, 1).squeeze(1)
+                                    elif uns_type == 'ENS':
+                                        prediction = model(data)
+    #                             print("test prediction raw:", prediction.shape)
+                                loss = F.nll_loss(prediction, target)
+        #                         print("train prediction raw:", prediction.shape)
+                                val_loss += loss.item()
+
+                                prediction = prediction.max(1)[1]  # max indeces
+    #                             print("prediction.max():", prediction.max())
+    #                             print("prediction.min():", prediction.min())
+                                correct += prediction.eq(target.view_as(prediction)).sum().item()
+    #                             print("test prediction prediction.max(1)[1]:", prediction.shape)
+    #                             print("test target:", target)
+
+                            percentage_correct = 100.0 * correct / len(val_loader.dataset)
+
+                            val_loss /= len(val_loader.dataset)
+                            if val_loss < best_loss:
+                                best_acc = copy.copy(percentage_correct)
+                                best_loss = copy.copy(loss)
+                                best_model = copy.deepcopy(model)
+
+#                             print("prev_loss:", prev_loss)
+                            print("val_loss:", val_loss)
+                            if prev_loss < val_loss:
+                                patience += 1
+
+                            prev_loss = copy.copy(val_loss)
+
+                        print("patience:", patience)
+                        print(
+                            "Val set: Accuracy: {}/{} ({:.2f}%)".format(
+                                correct, len(val_loader.dataset), percentage_correct
+                            )
+                        )
+                print("best val accuracy:", best_acc)
+                models.append(best_model)
 
             # Test
             for model in models:
@@ -269,7 +399,8 @@ for random_seed in random_seeds:
                     elif uns_type == 'ENS':
                         ens_test_output = []
                         for model in models:
-                            if model_name == 'ResNet-18' or model_name == 'ResNet-20':  
+                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
+#                                 ens_test_output.append(torch.log_softmax(model(data), dim=1))
                                 ens_test_output.append(torch.log_softmax(model(data), dim=1))
                             else:
                                 ens_test_output.append(model(data))
@@ -296,8 +427,9 @@ for random_seed in random_seeds:
             
             filename = PATH + "/" + alg + str(random_seed) + ".csv"
             file_exists = os.path.isfile(filename)
+
             with open(filename, 'a+', newline='') as csvfile:
-                fieldnames = ['Number of samples', 'Test accuracy', 'Test loss', 'Time', 'Labels', 'Indices']
+                fieldnames = ['Number of samples', 'Test accuracy', 'Test loss', 'Time']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
                 if not file_exists:
@@ -312,8 +444,6 @@ for random_seed in random_seeds:
                                  'Test accuracy': percentage_correct,
                                  'Test loss': "{:.6f}".format(loss.item()),
                                  'Time': period,
-                                 'Labels': targets[candidate_batch.indices] if targets is not None else None,
-                                 'Indices': dataset_indices if dataset_indices is not None else None
                 })
                 csvfile.close()
 
@@ -329,7 +459,7 @@ for random_seed in random_seeds:
         #     print("logits_N_K_C.size():", logits_N_K_C.size())
 
             with torch.no_grad():
-                model.eval()
+#                 model.eval()
 
                 for i, (data, _) in enumerate(tqdm(pool_loader, desc="Evaluating Acquisition Set", leave=False)):
                     data = data.to(device=device)
@@ -341,7 +471,7 @@ for random_seed in random_seeds:
                     elif uns_type == 'ENS':
                         ens_pool_output = []
                         for model in models:
-                            if model_name == 'ResNet-18' or model_name == 'ResNet-20':  
+                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
                                 ens_pool_output.append(torch.log_softmax(model(data), dim=1))
                             else:    
                                 ens_pool_output.append(model(data))
@@ -396,18 +526,7 @@ for random_seed in random_seeds:
             print("Scores: ", candidate_batch.scores)
             print("Labels: ", targets[candidate_batch.indices])
 
-            image_candidate = np.array(active_learning_data.pool_dataset)[candidate_batch.indices]
-            
             active_learning_data.acquire(candidate_batch.indices)
             added_indices.append(dataset_indices)
             pbar.update(len(dataset_indices))
-            
-            for i in range(image_candidate.shape[0]):
-                plt.clf()
-                plt.imshow(np.transpose(image_candidate[i][0].cpu().detach().numpy(), (1, 2, 0)))
-                plt.savefig(PATH + "/example_candidate_" + alg + str(i) + "_" \
-                            + str(len(active_learning_data.training_dataset)) + "_" + str(image_candidate[i][1]))
-
-            
-            
-    plot_graph('./', algs, uns_type, dataset_name, acquisition_batch_size, random_seed, num_initial_samples, max_training_samples)
+#     plot_graph(algs, uns_type, dataset_name, acquisition_batch_size, random_seed, num_initial_samples, max_training_samples)

@@ -43,16 +43,10 @@ class TransformedDataset(data.Dataset):
         return len(self.dataset)
 
 
-def create_CIFAR10_dataset():
-
-#     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))])
-
-#     train_dataset = datasets.CIFAR10("data", train=True, download=True, transform=transform)
-#     test_dataset = datasets.CIFAR10("data", train=False, transform=transform)
+def create_repeated_CIFAR100_dataset(*, num_repetitions: int = 3, add_noise: bool = True):
     
-#     stats = ((0.4914, 0.4822, 0.4465), (0.247, 0.243, 0.261))
     stats = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-    train_tfms = transforms.Compose([transforms.RandomCrop(32, padding=4), # ,padding_mode='reflect'
+    train_tfms = transforms.Compose([transforms.RandomCrop(32, padding=4,padding_mode='reflect'), 
                              transforms.RandomHorizontalFlip(), 
                              transforms.ToTensor(), 
                              transforms.Normalize(*stats,inplace=True)
@@ -60,9 +54,22 @@ def create_CIFAR10_dataset():
     
     valid_tfms = transforms.Compose([transforms.ToTensor(), transforms.Normalize(*stats)
                         ])
-       
-    train_dataset = datasets.CIFAR10("data", train=True, download=True, transform=train_tfms)
-    test_dataset = datasets.CIFAR10("data", train=False, transform=valid_tfms)
+    
+    train_dataset = datasets.CIFAR100("data", train=True, download=True, transform=train_tfms)
+    
+    if num_repetitions > 1:
+        train_dataset = data.ConcatDataset([train_dataset] * num_repetitions)
+
+    if add_noise:
+        dataset_noise = torch.empty((len(train_dataset), 32, 32), dtype=torch.float32).normal_(0.0, 0.1)
+
+        def apply_noise(idx, sample):
+            data, target = sample
+            return data + dataset_noise[idx], target
+
+        train_dataset = TransformedDataset(train_dataset, transformer=apply_noise)
+
+    test_dataset = datasets.CIFAR100("data", train=False, download=True, transform=valid_tfms)
 
     return train_dataset, test_dataset
 
