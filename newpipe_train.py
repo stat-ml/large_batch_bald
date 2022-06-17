@@ -42,30 +42,33 @@ from cnn_models import (
 )
 from torch.nn import functional as F
 from tqdm import tqdm
-from utils import init_glorot, plot_graph
 
-# from pytorch_resnet_cifar10.resnet import resnet20
+from utils import init_glorot, plot_graph
 
 parser = ArgumentParser()
 parser.add_argument('--dataset_name', type=str, default='MNIST')
-# parser.add_argument('--dataset_names', nargs='+', type=str, default=['CIFAR100', 'CIFAR10', 'EMNIST', 'FMNIST', 'SVHN', 'RMNIST', 'MNIST'])
 parser.add_argument('--model_name', type=str, default='CNN_ENS_RMNIST')
 parser.add_argument('--optimizer_name', type=str, default='Adam')
 parser.add_argument('--uns_type', type=str, default='ENS')
-parser.add_argument('--algs', nargs='+', type=str, default=['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB'])
-parser.add_argument('--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920]) # 42, 227, 346, 684, 920 
-parser.add_argument('--num_models', type=int, default=5) # 5, 10
+parser.add_argument(
+    '--algs', nargs='+', type=str, \
+    default=['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB']
+)
+parser.add_argument(
+    '--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920]
+)
+parser.add_argument('--num_models', type=int, default=5)
 parser.add_argument('--num_init_samples', type=int, default=200)
 parser.add_argument('--max_train_samples', type=int, default=10000)
 parser.add_argument('--acq_batch_size', type=int, default=100)
-parser.add_argument('--train_batch_size', type=int, default=50) # 64
-parser.add_argument('--pool_batch_size', type=int, default=100) #128
-parser.add_argument('--test_batch_size', type=int, default=5000) # 250 # 512
+parser.add_argument('--train_batch_size', type=int, default=50)
+parser.add_argument('--pool_batch_size', type=int, default=100)
+parser.add_argument('--test_batch_size', type=int, default=5000)
 parser.add_argument('--num_train_inference_samples', type=int, default=100)
 parser.add_argument('--num_test_inference_samples', type=int, default=5)
 parser.add_argument('--num_samples', type=int, default=100000)
 parser.add_argument('--num_epochs', type=int, default=50)
-parser.add_argument('--training_iterations', type=int, default=24576) # 4096*6
+parser.add_argument('--training_iterations', type=int, default=24576)
 parser.add_argument('--cuda_number', type=int, default=0)
 parser.add_argument('--dropout_rate', type=float, default=0.3)
 parser.add_argument('--val_size', type=int, default=5000)

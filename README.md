@@ -21,10 +21,16 @@ $$I_{\text{LBB}}(y_{1:b}; \theta) := \sum \limits_{i=1}^b I(y_i, \theta) - \sum 
 
 where $I$ - is a mutual information function.
 
+In addition, we looked into PowerBALD modification and added our own implementation for Large BatchBALD.
+
 ## Please cite us
 
 At the moment our paper is not published yet.
 
 ## How to use
+
+Available datasets: ['CIFAR100', 'CIFAR10', 'EMNIST', 'FMNIST', 'SVHN', 'RMNIST', 'MNIST']
+
+Available acquisition methods: ['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB']. These are shorts for: Power Large BatchBALD, PowerBALD, Random, Large BatchBALD, BALD and BatchBALD.
 
 We provide a simple example experiment that uses this package [here](example_link). 
