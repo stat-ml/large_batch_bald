@@ -129,6 +129,34 @@ def get_bald_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, d
     candiate_scores, candidate_indices = torch.topk(scores_N, batch_size)
 
     return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
+
+def get_entropy_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None) -> CandidateBatch:
+    N, K, C = log_probs_N_K_C.shape
+
+    batch_size = min(batch_size, N)
+
+    candidate_indices = []
+    candidate_scores = []
+
+    scores_N += compute_entropy(log_probs_N_K_C)
+
+    candiate_scores, candidate_indices = torch.topk(scores_N, batch_size)
+
+    return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
+
+def get_variance_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None) -> CandidateBatch:
+    N, K, C = log_probs_N_K_C.shape
+
+    batch_size = min(batch_size, N)
+
+    candidate_indices = []
+    candidate_scores = []
+
+    scores_N += torch.var(log_probs_N_K_C, dim=1).sum(dim=1)
+
+    candiate_scores, candidate_indices = torch.topk(scores_N, batch_size)
+
+    return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
 #####
 # def compute_entropy_vec(log_probs_N_K_C: torch.Tensor) -> torch.Tensor:
 #     N, K, C = log_probs_N_K_C.shape
@@ -531,6 +559,9 @@ def get_powerbald_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=No
 
     scores_N = -compute_conditional_entropy(log_probs_N_K_C)
     scores_N += compute_entropy(log_probs_N_K_C)
+#     print("probs_N_K_C:", torch.exp(log_probs_N_K_C))
+#     print("compute_conditional_entropy(log_probs_N_K_C):", compute_conditional_entropy(log_probs_N_K_C))
+#     print("compute_entropy(log_probs_N_K_C):", compute_entropy(log_probs_N_K_C))
     
     scores_N = torch.pow(scores_N, 5)
     scores_N /= torch.sum(scores_N)
