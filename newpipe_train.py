@@ -1,51 +1,49 @@
-from tqdm import tqdm
-import os
-import time
-import numpy as np
-import random
-import pandas as pd
+import copy
 import csv
-import os.path
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
 import json
 import math
-import copy
+import os
+import os.path
+import random
+import time
 from argparse import ArgumentParser
-
 from dataclasses import dataclass
 from typing import List
 
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import torch
-from torch.nn import functional as F
 import torchvision
-
 from batchbald_redux import (
-    progr_active_learning as active_learning,
     batchbald,
+    cifar10,
+    cifar100,
     consistent_mc_dropout,
-    joint_entropy,
-    repeated_mnist,
     emnist,
     fmnist,
-    cifar10,
-    repeated_cifar10,
-    cifar100,
-    repeated_cifar100,
-    svhn,
-    kmnist
+    joint_entropy,
+    kmnist,
 )
-
+from batchbald_redux import progr_active_learning as active_learning
+from batchbald_redux import (
+    repeated_cifar10,
+    repeated_cifar100,
+    repeated_mnist,
+    svhn,
+)
 from cnn_models import (
-    CNN_MC_RMNIST,
+    CNN_ENS_CIFAR10,
+    CNN_ENS_EMNIST,
     CNN_ENS_RMNIST,
     CNN_MC_EMNIST,
-    CNN_ENS_EMNIST,
-    CNN_ENS_CIFAR10
+    CNN_MC_RMNIST,
 )
-
+from torch.nn import functional as F
+from tqdm import tqdm
 from utils import init_glorot, plot_graph
+
 # from pytorch_resnet_cifar10.resnet import resnet20
 
 parser = ArgumentParser()

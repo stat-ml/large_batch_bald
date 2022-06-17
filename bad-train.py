@@ -1,4 +1,3 @@
-import copy
 import csv
 import json
 import math
@@ -7,8 +6,6 @@ import os.path
 import random
 import time
 from argparse import ArgumentParser
-from dataclasses import dataclass
-from typing import List
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -17,6 +14,7 @@ import pandas as pd
 import torch
 import torchvision
 from batchbald_redux import (
+    active_learning,
     batchbald,
     cifar10,
     cifar100,
@@ -24,9 +22,9 @@ from batchbald_redux import (
     emnist,
     fmnist,
     joint_entropy,
+    repeated_mnist,
+    svhn,
 )
-from batchbald_redux import progr_active_learning as active_learning
-from batchbald_redux import repeated_cifar10, repeated_mnist, svhn
 from cnn_models import (
     CNN_ENS_CIFAR10,
     CNN_ENS_EMNIST,
@@ -38,7 +36,6 @@ from torch.nn import functional as F
 from tqdm import tqdm
 
 from utils import init_glorot, plot_graph
-
 # from pytorch_resnet_cifar10.resnet import resnet20
 
 parser = ArgumentParser()
@@ -49,23 +46,18 @@ parser.add_argument('--optimizer_name', type=str, default='Adam')
 parser.add_argument('--uns_type', type=str, default='ENS')
 parser.add_argument('--algs', nargs='+', type=str, default=['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB'])
 parser.add_argument('--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920]) # 42, 227, 346, 684, 920 
-parser.add_argument('--num_models', type=int, default=5) # 5, 10
+parser.add_argument('--num_models', type=int, default=1) # 10
 parser.add_argument('--num_init_samples', type=int, default=200)
 parser.add_argument('--max_train_samples', type=int, default=10000)
 parser.add_argument('--acq_batch_size', type=int, default=100)
-parser.add_argument('--train_batch_size', type=int, default=50) # 64
-parser.add_argument('--pool_batch_size', type=int, default=100) #128
-parser.add_argument('--test_batch_size', type=int, default=250) # 512
+parser.add_argument('--train_batch_size', type=int, default=64) # 64
+parser.add_argument('--pool_batch_size', type=int, default=128)
+parser.add_argument('--test_batch_size', type=int, default=512) # 512
 parser.add_argument('--num_train_inference_samples', type=int, default=100)
 parser.add_argument('--num_test_inference_samples', type=int, default=5)
 parser.add_argument('--num_samples', type=int, default=100000)
-parser.add_argument('--num_epochs', type=int, default=50)
 parser.add_argument('--training_iterations', type=int, default=24576) # 4096*6
 parser.add_argument('--cuda_number', type=int, default=0)
-parser.add_argument('--dropout_rate', type=float, default=0.3)
-parser.add_argument('--val_size', type=int, default=5000)
-parser.add_argument('--lr', type=float, default=0.001)
-parser.add_argument('--patience_threshold', type=int, default=10)
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
@@ -104,17 +96,6 @@ elif dataset_name == 'CIFAR10':
     initial_samples = active_learning.get_balanced_sample_indices(
     cifar10.get_targets(train_dataset), num_classes=num_classes, n_per_digit=num_initial_samples / num_classes
 )
-elif dataset_name == 'RCIFAR10':
-    train_dataset, test_dataset = repeated_cifar10.create_repeated_CIFAR10_dataset(num_repetitions=4, add_noise=False)
-    num_classes = 10
-    initial_samples = active_learning.get_balanced_sample_indices(
-    repeated_cifar10.get_targets(train_dataset), num_classes=num_classes, n_per_digit=num_initial_samples / num_classes
-)
-#     initial_samples = active_learning.get_unbalanced_sample_indices(
-#     repeated_cifar10.get_targets(train_dataset), num_classes=num_classes, n_per_digit=num_initial_samples / num_classes,
-#         not_used_classes=[3, 5, 7]
-# )
-#     print("initial_samples.get_targets:", set(initial_samples.get_targets))
 elif dataset_name == 'CIFAR100':
     train_dataset, test_dataset = cifar100.create_CIFAR100_dataset()
     num_classes = 100
@@ -148,7 +129,7 @@ cuda_number = args.cuda_number
 start = torch.cuda.Event(enable_timing=True)
 end = torch.cuda.Event(enable_timing=True)
 
-epochs = args.num_epochs
+epochs = 200
 
 config = {
     'model': model_name,
@@ -169,11 +150,6 @@ except FileExistsError:
 
 with open(PATH + '/config.json', 'w') as f:
     json.dump(config, f)
-    
-@dataclass
-class CandidateBatch:
-    scores: List[float]
-    indices: List[int]
 
 for random_seed in random_seeds:
     for alg in algs:
@@ -208,30 +184,30 @@ for random_seed in random_seeds:
             batch_size=batch_size,
             **kwargs,
         )
+#         print("train data:", len(train_loader.dataset))
+
+#         random_ids = np.random.randint(len(active_learning_data.pool_dataset), size=5000)
+#         batches = data_loader[random_ids]
     
-        val_indeces = random.sample(range(0, len(active_learning_data.pool_dataset)), args.val_size)
-        active_learning_data.val_acquire(val_indeces)
-#         val_set = torch.utils.data.Subset(active_learning_data.pool_dataset, val_indeces)
         val_loader = torch.utils.data.DataLoader(
-            active_learning_data.val_dataset,
+            active_learning_data.pool_dataset,
             batch_size=batch_size,
             **kwargs,
         )
-        
-#         active_learning_data.pool_dataset = active_learning_data.remove_from_pool(val_indeces)
+#         val_loader = val_loader[random_ids]
 
         pool_loader = torch.utils.data.DataLoader(
             active_learning_data.pool_dataset, batch_size=scoring_batch_size, shuffle=False, **kwargs
         )
 #         print("pool data:", len(pool_loader.dataset))
 
-#         def append_dropout(model, rate=0.2):
-#             for name, module in model.named_children():
-#                 if len(list(module.children())) > 0:
-#                     append_dropout(module)
-#                 if isinstance(module, torch.nn.ReLU):
-#                     new = torch.nn.Sequential(module, torch.nn.Dropout2d(p=rate))
-#                     setattr(model, name, new)
+        def append_dropout(model, rate=0.25):
+            for name, module in model.named_children():
+                if len(list(module.children())) > 0:
+                    append_dropout(module)
+                if isinstance(module, torch.nn.ReLU):
+                    new = torch.nn.Sequential(module, torch.nn.Dropout2d(p=rate))
+                    setattr(model, name, new)
 
 
 
@@ -259,47 +235,77 @@ for random_seed in random_seeds:
                     model = CNN_ENS_RMNIST(num_classes).to(device=device)
                 elif model_name == 'ResNet-18':
                     model = torchvision.models.resnet18(pretrained=False, num_classes=num_classes).to(device=device)
-#                     append_dropout(model) ###
+                    append_dropout(model)
 #                     model = torchvision.models.resnet152(pretrained=False, num_classes=num_classes).to(device=device)
                 elif model_name == 'ResNet-20':
                     model = resnet20().to(device=device)
                 elif model_name == 'VGG-16':
                     model = torchvision.models.vgg16(pretrained=False, num_classes=num_classes).to(device=device)
-                elif model_name == 'DenseNet-121':
-#                     model = torchvision.models.densenet121(growth_rate=12, pretrained=False, num_classes=num_classes, drop_rate=0.2).to(device=device)
-                    model = torchvision.models.densenet121(pretrained=False, num_classes=num_classes, drop_rate=args.dropout_rate).to(device=device)
                 model.apply(init_glorot)
                 if optimizer_name == 'Adam':
-                    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr) # 0.001
+                    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 #                     optimizer = torch.optim.Adam(model.parameters(), 0.01, weight_decay=1e-4)
 #                     sched = torch.optim.lr_scheduler.OneCycleLR(optimizer, 0.01, epochs=epochs, 
 #                                                 steps_per_epoch=len(train_loader))
                 elif optimizer_name == 'SGD':
-#                     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
-                    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0005) #
-#                     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+                    optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
                 
-                patience = 0
-                prev_loss = 10e8
-                prev_acc = 0
-                best_loss = 10e8
-                best_acc = 0
-    
                 model.train()
-                
                 for epoch in range(epochs):
-#                     print("epoch:", epoch)
-                    while patience < args.patience_threshold:
-                        correct = 0
-                        epoch_loss = 0.0
+                    print("epoch:", epoch)
+                    correct = 0
+                    epoch_loss = 0.0
 
-                        # Train
-                        for data, target in tqdm(train_loader, desc="Training", leave=False):
+                    # Train
+                    for data, target in tqdm(train_loader, desc="Training", leave=False):
+                        data = data.to(device=device)
+                        target = target.to(device=device)
+
+                        optimizer.zero_grad()
+                        if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16':
+                            if uns_type == 'MC':
+                                prediction = torch.log_softmax(model(data, 1).squeeze(1), dim=1)
+                            elif uns_type == 'ENS':
+                                prediction = torch.log_softmax(model(data), dim=1)
+                        else:
+                            if uns_type == 'MC':
+                                prediction = model(data, 1).squeeze(1)
+                            elif uns_type == 'ENS':
+                                prediction = model(data)
+
+                        loss = F.nll_loss(prediction, target)
+
+                        loss.backward()
+                        optimizer.step()
+#                         sched.step() ###
+#                         print("train prediction raw:", prediction.shape)
+                        epoch_loss += loss.item()
+
+                        prediction = prediction.max(1)[1] # max indeces
+                        correct += prediction.eq(target.view_as(prediction)).sum().item()
+                        
+#                         print("train prediction.max(1)[1]:", prediction.shape)
+#                         print("train target:", target)
+
+                    train_percentage_correct = 100.0 * correct / len(train_loader.dataset)
+                    epoch_loss /= len(train_loader.dataset)
+                    print("epoch_loss:", epoch_loss)
+
+                    print(
+                        "Train set: Accuracy: {}/{} ({:.2f}%)".format(
+                            correct, len(train_loader.dataset), train_percentage_correct
+                        )
+                    )
+                    
+                    val_loss = 0
+                    correct = 0
+                    with torch.no_grad():
+                        for data, target in tqdm(val_loader, desc="val", leave=False):
                             data = data.to(device=device)
                             target = target.to(device=device)
+#                             print("model(data):", model(data))
 
-                            optimizer.zero_grad()
-                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
+                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16':
                                 if uns_type == 'MC':
                                     prediction = torch.log_softmax(model(data, 1).squeeze(1), dim=1)
                                 elif uns_type == 'ENS':
@@ -309,88 +315,30 @@ for random_seed in random_seeds:
                                     prediction = model(data, 1).squeeze(1)
                                 elif uns_type == 'ENS':
                                     prediction = model(data)
-
+#                             print("test prediction raw:", prediction.shape)
                             loss = F.nll_loss(prediction, target)
-
-                            loss.backward()
-                            optimizer.step()
-    #                         sched.step() ###
     #                         print("train prediction raw:", prediction.shape)
-                            epoch_loss += loss.item()
+                            val_loss += loss.item()
 
-                            prediction = prediction.max(1)[1] # max indeces
+                            prediction = prediction.max(1)[1]  # max indeces
+#                             print("prediction.max():", prediction.max())
+#                             print("prediction.min():", prediction.min())
                             correct += prediction.eq(target.view_as(prediction)).sum().item()
+#                             print("test prediction prediction.max(1)[1]:", prediction.shape)
+#                             print("test target:", target)
 
-    #                         print("train prediction.max(1)[1]:", prediction.shape)
-    #                         print("train target:", target)
-
-                        train_percentage_correct = 100.0 * correct / len(train_loader.dataset)
-                        epoch_loss /= len(train_loader.dataset)
-                        print("epoch_loss:", epoch_loss)
-
-                        print(
-                            "Train set: Accuracy: {}/{} ({:.2f}%)".format(
-                                correct, len(train_loader.dataset), train_percentage_correct
-                            )
+                        percentage_correct = 100.0 * correct / len(val_loader.dataset)
+                        
+                        val_loss /= len(val_loader.dataset)
+                        print("val_loss:", val_loss)
+    
+                    print(
+                        "Val set: Accuracy: {}/{} ({:.2f}%)".format(
+                            correct, len(val_loader.dataset), percentage_correct
                         )
+                    )
 
-                        val_loss = 0
-                        correct = 0
-                        with torch.no_grad():
-                            for data, target in tqdm(val_loader, desc="val", leave=False):
-                                data = data.to(device=device)
-                                target = target.to(device=device)
-    #                             print("model(data):", model(data))
-
-                                if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
-                                    if uns_type == 'MC':
-                                        prediction = torch.log_softmax(model(data, 1).squeeze(1), dim=1)
-                                    elif uns_type == 'ENS':
-                                        prediction = torch.log_softmax(model(data), dim=1)
-                                else:
-                                    if uns_type == 'MC':
-                                        prediction = model(data, 1).squeeze(1)
-                                    elif uns_type == 'ENS':
-                                        prediction = model(data)
-    #                             print("test prediction raw:", prediction.shape)
-                                loss = F.nll_loss(prediction, target)
-        #                         print("train prediction raw:", prediction.shape)
-                                val_loss += loss.item()
-
-                                prediction = prediction.max(1)[1]  # max indeces
-    #                             print("prediction.max():", prediction.max())
-    #                             print("prediction.min():", prediction.min())
-                                correct += prediction.eq(target.view_as(prediction)).sum().item()
-    #                             print("test prediction prediction.max(1)[1]:", prediction.shape)
-    #                             print("test target:", target)
-
-                            percentage_correct = 100.0 * correct / len(val_loader.dataset)
-
-                            val_loss /= len(val_loader.dataset)
-#                             if val_loss < best_loss:
-                            if percentage_correct > best_acc:
-                                best_acc = copy.copy(percentage_correct)
-                                best_loss = copy.copy(val_loss)
-                                best_model = copy.deepcopy(model)
-
-#                             print("prev_loss:", prev_loss)
-                            print("prev_acc:", prev_acc)
-                            print("val_loss:", val_loss)
-#                             if prev_loss < val_loss:
-                            if prev_acc > percentage_correct:
-                                patience += 1
-
-#                             prev_loss = copy.copy(val_loss)
-                            prev_acc = copy.copy(percentage_correct)
-
-                        print("patience:", patience)
-                        print(
-                            "Val set: Accuracy: {}/{} ({:.2f}%)".format(
-                                correct, len(val_loader.dataset), percentage_correct
-                            )
-                        )
-                print("best val accuracy:", best_acc)
-                models.append(best_model)
+                models.append(model)
 
             # Test
             for model in models:
@@ -411,7 +359,7 @@ for random_seed in random_seeds:
                     elif uns_type == 'ENS':
                         ens_test_output = []
                         for model in models:
-                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
+                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16':  
 #                                 ens_test_output.append(torch.log_softmax(model(data), dim=1))
                                 ens_test_output.append(torch.log_softmax(model(data), dim=1))
                             else:
@@ -448,7 +396,7 @@ for random_seed in random_seeds:
                     writer.writeheader()
 
                 if len(active_learning_data.training_dataset) != num_initial_samples: 
-                    period = 0 # period = "{:.6f}".format(end - start)
+                    period = "{:.6f}".format(end - start)
                 else:
                     period = 0
 
@@ -483,7 +431,7 @@ for random_seed in random_seeds:
                     elif uns_type == 'ENS':
                         ens_pool_output = []
                         for model in models:
-                            if model_name == 'ResNet-18' or model_name == 'ResNet-20' or model_name == 'VGG-16' or model_name == 'DenseNet-121':
+                            if model_name == 'ResNet-18' or model_name == 'ResNet-20':  
                                 ens_pool_output.append(torch.log_softmax(model(data), dim=1))
                             else:    
                                 ens_pool_output.append(model(data))
@@ -507,13 +455,9 @@ for random_seed in random_seeds:
                         logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device
                     )
                 elif alg == 'Rand':
-#                     candidate_batch = batchbald.get_random_batch(
-#                         logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device
-#                     )
-                    candiate_scores, candidate_indices = np.random.randn(acquisition_batch_size), active_learning_data.get_random_pool_indices(acquisition_batch_size)
-#                     np.random.choice(active_learning_data.pool_dataset.indices, acquisition_batch_size)
-                    candidate_batch = CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
-                    
+                    candidate_batch = batchbald.get_random_batch(
+                        logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device
+                    )
                 elif alg == 'PLBB': 
                     candidate_batch = batchbald.get_powerlbb_batch(
                         logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device, alpha=5
@@ -536,8 +480,6 @@ for random_seed in random_seeds:
                 targets = svhn.get_targets(active_learning_data.pool_dataset)
             elif dataset_name == 'MNIST' or dataset_name == 'RMNIST':
                 targets = repeated_mnist.get_targets(active_learning_data.pool_dataset)
-            elif dataset_name == 'RCIFAR10':
-                targets = repeated_cifar10.get_targets(active_learning_data.pool_dataset)    
             dataset_indices = active_learning_data.get_dataset_indices(candidate_batch.indices)
 
             print("Dataset indices: ", dataset_indices)

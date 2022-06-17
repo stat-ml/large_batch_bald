@@ -1,8 +1,8 @@
-from torch import nn
-import matplotlib.pyplot as plt
 import matplotlib
-import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from torch import nn
 
 def init_glorot(model):
     for module in model.modules():

@@ -1,10 +1,9 @@
 import argparse
-from tqdm import tqdm
 
 import torch
 import torch.nn.functional as F
-
-from torchvision import models, datasets, transforms
+from torchvision import datasets, models, transforms
+from tqdm import tqdm
 
 
 def get_CIFAR10(root="./"):

@@ -1,7 +1,7 @@
 import torch
+from batchbald_redux import consistent_mc_dropout
 from torch import nn as nn
 from torch.nn import functional as F
-from batchbald_redux import consistent_mc_dropout
 
 class CNN_MC_RMNIST(consistent_mc_dropout.BayesianModule):
     def __init__(self, num_classes=10):
