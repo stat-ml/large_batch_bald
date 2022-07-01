@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 import math
+import timeit
 from argparse import ArgumentParser
 
 from dataclasses import dataclass
@@ -139,8 +140,8 @@ training_iterations = args.training_iterations
 T = args.num_models
 cuda_number = args.cuda_number
 
-start = torch.cuda.Event(enable_timing=True)
-end = torch.cuda.Event(enable_timing=True)
+# start = torch.cuda.Event(enable_timing=True)
+# end = torch.cuda.Event(enable_timing=True)
 
 config = {
     'model': model_name,
@@ -361,8 +362,9 @@ for random_seed in random_seeds:
                         logits_N_K_C[lower:upper].copy_(ens_pool_output.double(), non_blocking=True)
 
             with torch.no_grad():
-                torch.cuda.synchronize()
-                start = time.perf_counter()
+#                 torch.cuda.synchronize()
+#                 start = time.perf_counter()
+                start = timeit.default_timer()
                 if alg == 'BB':
                     candidate_batch = batchbald.get_batchbald_batch(
                         logits_N_K_C, acquisition_batch_size, num_samples, dtype=torch.double, device=device
@@ -390,7 +392,16 @@ for random_seed in random_seeds:
                     candidate_batch = batchbald.get_powerbald_batch(
                         logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device, alpha=5
                     )
-                end = time.perf_counter()
+                elif alg == 'DPPLBB': 
+                    candidate_batch = batchbald.get_dpp_lbb_batch(
+                        logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device, alpha=5, power=False
+                    )
+                elif alg == 'DPPPLBB': 
+                    candidate_batch = batchbald.get_dpp_lbb_batch(
+                        logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device, alpha=5, power=True
+                    )
+#                 end = time.perf_counter()
+                end = timeit.default_timer()
                 print("acquisition time (sec.):", end - start)
             if dataset_name == 'CIFAR10':
                 targets = cifar10.get_targets(active_learning_data.pool_dataset)

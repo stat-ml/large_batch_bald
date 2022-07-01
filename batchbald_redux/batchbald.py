@@ -16,7 +16,12 @@ from batchbald_redux import joint_entropy
 
 # Cell
 import numpy as np
+from numpy import savetxt
+from numpy import asarray
+from numpy import savez_compressed
 import random
+from dppy.finite_dpps import FiniteDPP
+from scipy.optimize import root_scalar
 
 random_seed = 42
 random.seed(random_seed)
@@ -549,7 +554,7 @@ def get_powerlbb_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=Non
 
     return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
 
-def get_powerbald_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None) -> CandidateBatch:
+def get_powerbald_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None, alpha=None) -> CandidateBatch:
     N, K, C = log_probs_N_K_C.shape
 
     batch_size = min(batch_size, N)
@@ -563,9 +568,341 @@ def get_powerbald_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=No
 #     print("compute_conditional_entropy(log_probs_N_K_C):", compute_conditional_entropy(log_probs_N_K_C))
 #     print("compute_entropy(log_probs_N_K_C):", compute_entropy(log_probs_N_K_C))
     
-    scores_N = torch.pow(scores_N, 5)
+    scores_N = torch.pow(scores_N, alpha)
     scores_N /= torch.sum(scores_N)
     candidate_indices = torch.multinomial(scores_N, batch_size, replacement=False)
     candiate_scores = scores_N[candidate_indices]
 
     return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
+
+# def get_dpp_lbb_batch2(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None, alpha=None) -> CandidateBatch:
+#     N, K, C = log_probs_N_K_C.shape
+
+#     batch_size = min(batch_size, N)
+
+#     candidate_indices = []
+#     candidate_scores = []
+
+#     scores_N = -compute_conditional_entropy(log_probs_N_K_C)
+#     scores_N += compute_entropy(log_probs_N_K_C)
+
+#     entropies_N = torch.empty(N, dtype=torch.double)
+#     nats_nn = torch.empty((N, N), dtype=torch.double) # mb fill it with zeros and then plus small values (to prevent zeros); sampling is proport to mut info b/w (bigger val-s are more interesting)
+
+#     pbar = tqdm(total=N, desc="Entropy", leave=False)
+
+#     @toma.execute.chunked(log_probs_N_K_C, 1024)
+#     def compute(log_probs_n_K_C, start: int, end: int):
+#         mean_log_probs_n_C = torch.logsumexp(log_probs_n_K_C, dim=1) - math.log(K)
+#         n = log_probs_n_K_C.shape[0]
+#         a = torch.matmul(torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, :, None].to(device), torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, None, :].to(device))
+
+#         zero_diag_mask = (torch.ones(n) - torch.eye(n)).repeat(C, K, 1, 1) # [C, K, n, n]
+#         a = a * zero_diag_mask.to(device)
+#         a_nn = a.sum(dim=1) / K
+#         a_nn = a_nn.view(n, n, C) # [n, n, C]
+#         a = a.sum(dim=(1, 2)) / K
+#         a = a.t()
+    
+#         c = torch.matmul(torch.exp(mean_log_probs_n_C).permute(1, 0)[:, :, None].to(device), torch.exp(mean_log_probs_n_C).permute(1, 0)[:, None, :].to(device)) 
+#         zero_diag_mask2 = (torch.ones(n) - torch.eye(n)).repeat(C, 1, 1) # [C, n, n]
+#         c = c * zero_diag_mask2.to(device)
+#         c_nn = c.view(n, n, C) # [n, n, C]
+#         c = c.sum(dim=1)
+#         c = c.t()
+    
+#         nats_n = (a * (torch.log(1.0 + a) - torch.log(1.0 + c))).sum(dim=1) # [n]
+#         temp_nn = (a_nn * (torch.log(1.0 + a_nn) - torch.log(1.0 + c_nn))).sum(dim=2) # [n, n]
+
+#         entropies_N[start:end].copy_(-nats_n)
+# #         print("nats_nn[start:end][start:end].shape:", nats_nn[start:end][start:end].shape) 
+# #         print("a_nn.shape:", a_nn.shape)
+# #         print("c_nn.shape:", c_nn.shape)
+# #         for i in range(start, end+1):
+# #         print("start:", start)
+# #         print("end:", end)
+# #         print("nats_nn.shape", nats_nn.shape)
+# #         print("nats_nn[start:end, start:end].shape:", nats_nn[start:end, start:end].shape)
+# #         print("temp_nn.shape:", temp_nn.shape)
+#         nats_nn[start:end, start:end].copy_(temp_nn) # 44K vs 1024 # check on minus
+# #         print("nats_nn[start:end, start:end]:", nats_nn[start:end, start:end])
+# #         print("nats_nn.shape:", nats_nn.shape)
+# #         nats_nn[start:end][start:end].copy_((a_nn * (torch.log(1.0 + a_nn) - torch.log(1.0 + c_nn))).sum(dim=2))
+#         pbar.update(end - start)
+
+#     pbar.close()
+# #     print("nats_nn:", nats_nn)
+#     scores_N -= entropies_N
+#     scores_N[scores_N <= 0] = 1e-12 # to prevent <= zeros
+# #     print("scores_N:", scores_N)
+
+#     candiate_scores, candidate_indices = torch.topk(scores_N, batch_size)
+# #     print("candiate_scores:", candiate_scores)
+# #     print("candidate_indices:", candidate_indices)
+    
+# #     micro = 1e-12
+# #     nats_nn += np.random.random(nats_nn.shape) * micro # mb remove
+# #     print("nats_nn:", nats_nn) # too big, probably
+
+# #     nats_nn[nats_nn <=0] = 1e-12
+
+#     nats_ind_nn = nats_nn.index_select(0, candidate_indices).view(len(candidate_indices), N)
+    
+# #     print("nats_ind_nn.shape:", nats_ind_nn.shape)
+
+#     nats_ind_nn = nats_ind_nn.index_select(1, candidate_indices).view(len(candidate_indices), len(candidate_indices))
+    
+#     # [candidate_indices, candidate_indices].view(len(candidate_indices), len(candidate_indices)) # need to take not only diag but all combs
+    
+# #     print("nats_ind_nn.shape:", nats_ind_nn.shape)
+# #     print("nats_ind_nn:", nats_ind_nn) # not symm # ? neg scores are ok?
+# #     print("nats_ind_nn.T:", nats_ind_nn.T)
+# #     print("torch.all(torch.eq(nats_ind_nn, nats_ind_nn.T)):", torch.all(torch.eq(nats_ind_nn, nats_ind_nn.T)))
+# #     print("torch.where((nats_ind_nn != nats_ind_nn.T).all(dim=0))[0]:", torch.where((nats_ind_nn != nats_ind_nn.T).all(dim=0))[0])
+
+# #     array = is_square(nats_ind_nn)
+# #     print("array:", array)
+
+# #     idx = np.arange(min(20, nats_ind_nn.shape[0]))
+# #     print("idx:", idx)
+# #     M = nats_ind_nn[np.ix_(idx, idx)]
+# #     print("M.shape:", M.shape)
+# #     print("M:", M)
+# #     print("M.T.shape:", M.T.shape)
+# #     print("M.T:", M.T)
+    
+# #     if np.allclose(M.T, M):
+# #         print("True")
+#     nats_ind_nn = torch.eye(nats_ind_nn.shape[0]) * torch.diag(nats_ind_nn)
+#     nats_nn[nats_nn < 0] = 0.0
+#     dpp = FiniteDPP('likelihood', **{'L': nats_ind_nn}) # eig vals should be >= 0 -- for now not
+# #     print("torch.count_zero(nats_ind_nn):", nats_nn.shape[0] * nats_nn.shape[1] - torch.count_nonzero(nats_nn))
+# #     dpp = FiniteDPP('likelihood', **{'L': nats_nn[candidate_indices, candidate_indices]})
+#     ATTEMPTS = 5 # how many times do we sample
+#     for _ in range(ATTEMPTS):
+#         dpp.sample_exact()
+#         ids = dpp.list_of_samples[-1]
+#         if len(ids):  # We should retry if mask is zero-length
+#             break
+    
+#     candiate_scores, candidate_indices = candiate_scores[ids], candidate_indices[ids]
+
+#     return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
+
+def _rank(eigen_values):
+    rank = np.count_nonzero(eigen_values > 1e-3)
+    return rank
+
+def get_nu(eigen_values, k):
+    """
+    Get tilting coefficient to correctly approximate k-dpp marginal probabilities
+    See amblard2018
+    :param eigen_values: eigen values of L (likelihood) matrix for dpp
+    :param k: how much samples do we plan to take
+    :return: tilting coefficient
+    """
+    values = eigen_values + 1e-14
+    def point(nu):
+        exp_nu = np.exp(nu)
+        expect = np.sum([val*exp_nu / (1 + exp_nu*val) for val in values])
+        return expect - k # should be zero if nu is a solution
+
+    try:
+        solution = root_scalar(point, bracket=[-10., 10.]) # search for nu coeff in [-10., 10.]
+        assert solution.converged
+        return solution.root
+    except (ValueError, AssertionError):
+        raise ValueError('k-dpp: Probably too small matrix rank for the k')
+
+def get_dpp_lbb_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None, alpha=5, power=None) -> CandidateBatch:
+    N, K, C = log_probs_N_K_C.shape
+
+    batch_size = min(batch_size, N)
+
+    candidate_indices = []
+    candidate_scores = []
+
+    scores_N = -compute_conditional_entropy(log_probs_N_K_C)
+    scores_N += compute_entropy(log_probs_N_K_C)
+    
+    if power:
+        scores_N = torch.pow(scores_N, alpha)
+        scores_N /= torch.sum(scores_N)
+        candidate_indices = torch.multinomial(scores_N, batch_size, replacement=False)
+        candiate_scores = scores_N[candidate_indices]
+    else:
+        candiate_scores, candidate_indices = torch.topk(scores_N, batch_size)
+
+    log_probs_n_K_C = log_probs_N_K_C.index_select(0, candidate_indices) # ex.: [100, 5, 10]
+#     print("log_probs_n_K_C.shape:", log_probs_n_K_C.shape)
+
+    mean_log_probs_n_C = torch.logsumexp(log_probs_n_K_C, dim=1) - math.log(K)
+    n = log_probs_n_K_C.shape[0]
+    a = torch.matmul(torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, :, None].to(device), torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, None, :].to(device))
+
+    zero_diag_mask = (torch.ones(n) - torch.eye(n)).repeat(C, K, 1, 1) # [C, K, n, n]
+    a = a * zero_diag_mask.to(device)
+    a_nn = a.sum(dim=1) / K # [C, n, n]
+#     a_nn = a_nn.view(n, n, C) # [n, n, C]
+    
+#     print("torch.all(torch.eq(a_nn, a_nn.T)):", torch.all(torch.eq(a_nn.view(a_nn.shape[0], a_nn.shape[1], a_nn.shape[2]), a_nn.view(a_nn.shape[1], a_nn.shape[0], a_nn.shape[2]))))
+
+    c = torch.matmul(torch.exp(mean_log_probs_n_C).permute(1, 0)[:, :, None].to(device), torch.exp(mean_log_probs_n_C).permute(1, 0)[:, None, :].to(device))
+#     print("c.shape:", c.shape)
+#     print("torch.all(torch.eq(c, c.T)):", torch.all(torch.eq(c.view(c.shape[0], c.shape[1], c.shape[2]), c.view(c.shape[0], c.shape[2], c.shape[1]))))
+    zero_diag_mask2 = (torch.ones(n) - torch.eye(n)).repeat(C, 1, 1) # [C, n, n]
+#     print("torch.all(torch.eq(zero_diag_mask2, zero_diag_mask2.T)):", torch.all(torch.eq(zero_diag_mask2.view(zero_diag_mask2.shape[0], zero_diag_mask2.shape[1], zero_diag_mask2.shape[2]), zero_diag_mask2.view(zero_diag_mask2.shape[0], zero_diag_mask2.shape[2], zero_diag_mask2.shape[1]))))
+    c_nn = c * zero_diag_mask2.to(device) # [C, n, n]
+#     c_nn = c_nn.view(n, n, C) # [n, n, C]
+
+#     print("torch.all(torch.eq(c_nn, c_nn.T)):", torch.all(torch.eq(c_nn.view(c_nn.shape[0], c_nn.shape[1], c_nn.shape[2]), c_nn.view(c_nn.shape[1], c_nn.shape[0], c_nn.shape[2]))))
+
+    nats_nn = (a_nn * (torch.log(1.0 + a_nn) - torch.log(1.0 + c_nn))).sum(dim=0) # [n, n]
+#     print("nats_nn:", nats_nn)
+#     print("torch.all(torch.eq(nats_nn, nats_nn.T)):", torch.all(torch.eq(nats_nn, nats_nn.T)))
+#     b = (torch.log(1.0 + a_nn) - torch.log(1.0 + c_nn))
+#     d = (a_nn * (torch.log(1.0 + a_nn) - torch.log(1.0 + c_nn)))
+#     print("d.shape:", d.shape)
+#     print("torch.all(torch.eq(b, b.T)):", torch.all(torch.eq(b.view(b.shape[0], b.shape[1], b.shape[2]), b.view(b.shape[1], b.shape[0], b.shape[2]))))
+#     print("torch.all(torch.eq(d, d.T)):", torch.all(torch.eq(d.view(d.shape[0], d.shape[1], d.shape[2]), d.view(d.shape[1], d.shape[0], d.shape[2]))))
+#     nats_nn[nats_nn <= 0] = 10e-12
+#     print("d[:, :, 0]:", d[:, :, 0].view(d.shape[0], d.shape[1], 1))
+#     print("d[:, :, 0]:", d[:, :, 0].view(d.shape[1], d.shape[0], 1))
+
+#     nats_nn = torch.eye(nats_nn.shape[0]).to(device) * torch.diag(nats_nn).to(device)
+    nats_nn[nats_nn <= 0] = 1e-12 # 10e-6 -- best # last was 1e-12
+#     print("torch.max(nats_nn):", torch.max(nats_nn))
+#     print("torch.min(nats_nn):", torch.min(nats_nn))
+    L = nats_nn.detach().cpu().numpy()
+#     savez_compressed('L_before_noise.npz', L)
+# mb norm option
+#     dpp = FiniteDPP('likelihood', **{'L': L.detach().cpu().numpy()})
+#     ATTEMPTS = 5 # how many times do we try to sample
+#     for _ in range(ATTEMPTS):
+#         dpp.sample_exact()
+#         ids = dpp.list_of_samples[-1]
+#         if len(ids):  # We should retry if mask is zero-length
+#             break
+    noise_level = 0.5 # 0.2 # 1e-3 
+    L += noise_level * np.eye(len(L))
+    eigen_values = np.linalg.eigh(L)[0]
+#     print("eigen_values:", eigen_values)
+#     print("eigen_values.max():", eigen_values.max())
+#     print("eigen_values.min():", eigen_values.min())
+#     print("rank L:", _rank(eigen_values))
+    k = int(batch_size/10)
+    nu = get_nu(eigen_values, k)
+    I = torch.eye(len(L)).to(device)
+    L_tilted = np.exp(nu) * torch.DoubleTensor(L).to(device)
+    K_tilted = torch.mm(L_tilted, torch.inverse(L_tilted + I)).double()
+#     kdpp = FiniteDPP('correlation', **{"K": K_tilted.detach().cpu().numpy()})
+    kdpp = FiniteDPP('likelihood', **{"L": L_tilted.detach().cpu().numpy()})
+    ids = kdpp.sample_exact_k_dpp(k)
+    
+    candiate_scores, candidate_indices = candiate_scores[ids], candidate_indices[ids]
+    
+#     savez_compressed('eigen_values.npz', eigen_values)
+#     savez_compressed('log_eigen_values.npz', np.log(eigen_values))
+#     savez_compressed('L.npz', L)
+#     savez_compressed('L_tilted.npz', L_tilted.detach().cpu().numpy())
+
+    return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
+
+###################
+# def get_dpp_lbb_batch(log_probs_n_K_C: torch.Tensor, batch_size: int, dtype=None, device=None, alpha=None) -> CandidateBatch:
+#     n, K, C = log_probs_n_K_C.shape
+
+#     batch_size = min(batch_size, n)
+
+#     candidate_indices = []
+#     candidate_scores = []
+
+#     scores_N = -compute_conditional_entropy(log_probs_n_K_C)
+#     scores_N += compute_entropy(log_probs_n_K_C)
+    
+#     entropies_N = torch.empty(n, dtype=torch.double)
+#     nats_nn = torch.empty((n, n), dtype=torch.double)
+
+#     pbar = tqdm(total=n, desc="Entropy", leave=False)
+
+#     mean_log_probs_n_C = torch.logsumexp(log_probs_n_K_C, dim=1) - math.log(K)
+#     n = log_probs_n_K_C.shape[0]
+#     a = torch.matmul(torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, :, None].to(device), torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, None, :].to(device))
+
+#     zero_diag_mask = (torch.ones(n) - torch.eye(n)).repeat(C, K, 1, 1) # [C, K, n, n]
+#     a = a * zero_diag_mask.to(device)
+#     a_nn = a.sum(dim=1) / K
+#     a_nn = a_nn.view(n, n, C) # [n, n, C]
+#     a = a.sum(dim=(1, 2)) / K
+#     a = a.t()
+
+#     c = torch.matmul(torch.exp(mean_log_probs_n_C).permute(1, 0)[:, :, None].to(device), torch.exp(mean_log_probs_n_C).permute(1, 0)[:, None, :].to(device)) 
+#     zero_diag_mask2 = (torch.ones(n) - torch.eye(n)).repeat(C, 1, 1) # [C, n, n]
+#     c = c * zero_diag_mask2.to(device)
+#     c_nn = c.view(n, n, C) # [n, n, C]
+#     c = c.sum(dim=1)
+#     c = c.t()
+
+#     nats_n = (a * (torch.log(1.0 + a) - torch.log(1.0 + c))).sum(dim=1) # [n]
+# #         nats_nn = (a_nn * (torch.log(1.0 + a_nn) - torch.log(1.0 + c_nn))).sum(dim=2) # [n, n]
+
+#     entropies_N.copy_(-nats_n)
+#     nats_nn.copy_((a_nn * (torch.log(1.0 + a_nn) - torch.log(1.0 + c_nn))).sum(dim=2))
+#     pbar.update(end - start)
+
+#     pbar.close()
+#     print("nats_nn:", nats_nn)
+#     scores_N -= entropies_N
+#     scores_N[scores_N < 0] = 1e-12 # to prevent zeros
+# #     print("scores_N:", scores_N)
+
+#     candiate_scores, candidate_indices = torch.topk(scores_N, batch_size*10)
+    
+#     micro = 1e-12
+#     nats_nn += np.random.random(nats_nn.shape) * micro # mb remove
+    
+#     dpp = FiniteDPP('likelihood', **{'L': nats_nn[candidate_indices][candidate_indices]})
+    
+#     ATTEMPTS = 5 # mb fix
+#     for _ in range(ATTEMPTS):
+#         dpp.sample_exact()
+#         ids = dpp.list_of_samples[-1]
+#         if len(ids):  # We should retry if mask is zero-length
+#             break
+    
+#     candiate_scores, candidate_indices = candiate_scores[ids], candidate_indices[ids]
+
+#     return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
+##################################
+# def compute_entropy_vec(log_probs_N_K_C: torch.Tensor, device) -> torch.Tensor:
+#     N, K, C = log_probs_N_K_C.shape
+
+#     entropies_N = torch.empty(N, dtype=torch.double)
+
+#     pbar = tqdm(total=N, desc="Entropy", leave=False)
+
+#     @toma.execute.chunked(log_probs_N_K_C, 1024)
+#     def compute(log_probs_n_K_C, start: int, end: int):
+#         mean_log_probs_n_C = torch.logsumexp(log_probs_n_K_C, dim=1) - math.log(K)
+#         n = log_probs_n_K_C.shape[0]
+
+#         a = torch.matmul(torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, :, None].to(device), torch.exp(log_probs_n_K_C).permute(2, 1, 0)[:, :, None, :].to(device))
+#         zero_diag_mask = (torch.ones(n) - torch.eye(n)).repeat(C, K, 1, 1)
+#         a = a * zero_diag_mask.to(device)
+#         a = a.sum(dim=(1, 2)) / K
+#         a = a.t()
+    
+#         c = torch.matmul(torch.exp(mean_log_probs_n_C).permute(1, 0)[:, :, None].to(device), torch.exp(mean_log_probs_n_C).permute(1, 0)[:, None, :].to(device))
+#         zero_diag_mask2 = (torch.ones(n) - torch.eye(n)).repeat(C, 1, 1)
+#         c = c * zero_diag_mask2.to(device)
+#         c = c.sum(dim=1)
+#         c = c.t()
+
+#         nats_n = (a * (torch.log(1.0 + a) - torch.log(1.0 + c))).sum(dim=1)
+#         entropies_N[start:end].copy_(-nats_n)
+
+#         pbar.update(end - start)
+
+#     pbar.close()
+
+#     return entropies_N
