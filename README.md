@@ -1,64 +1,46 @@
-# BatchBALD Redux
-> Clean reimplementation of \"BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian Active Learning\"
-
-
-For an introduction & more information, see  http://batchbald.ml/. The paper can be found at http://arxiv.org/abs/1906.08158.
-
-The original implementation used in the paper is available at https://github.com/BlackHC/BatchBALD.
-
-We are grateful for fastai's [nbdev](https://nbdev.fast.ai/) which is powering this package.
-
-For more information, explore the sections and notebooks in the left-hand menu.
-The code is available on https://github.com/BlackHC/batchbald_redux, 
-and the website on https://blackhc.github.io/batchbald_redux.
+# Scalable Batch Acquisition for Deep Bayesian Active Learning
+This is a PyTorch implementation of the [SDM 2023](https://www.siam.org/conferences/cm/conference/sdm23) paper [Scalable Batch Acquisition for Deep Bayesian Active Learning](https://arxiv.org/abs/2301.05490). Our work present a novel bayesian active learning algorithm called Large BatchBALD (and its stochastic extension Power Large BatchBALD), which gives a well-grounded approximation to the [BatchBALD](https://arxiv.org/abs/1906.08158) method and aims to achieve comparable quality while being more computationally efficient.
 
 ## Install
-
 `pip install batchbald_redux`
 
-## Motivation
-
-BatchBALD is an algorithm and acquisition function for Active Learning in a Bayesian setting using BNNs and MC dropout.
-
-The aquisition function is the mutual information between the joint of a candidate batch and the model parameters $\omega$:
-
-{% raw %}
-$$a_{\text{BatchBALD}}((y_b)_B) = I[(y_b)_B;\omega]$$
-{% endraw %}
-
-The best candidate batch is one that maximizes this acquisition function. 
-
-In the paper, we show that this function satisfies sub-modularity, which provides us an optimality guarantee for a greedy algorithm. The candidate batch is selected using greedy expansion.
-
-Joint entropies are hard to estimate and, for everything to work, one also has to use consistent MC dropout, which keeps a set of dropout masks fixed while scoring the pool set.
-
-To aid reproducibility and baseline reproduction, we provide this simpler and clearer reimplementation.
-
-## Please cite us
-
+## Train examples
+FMNIST with MC-dropout:
+```sh
+python sampling_train.py --dataset_name='FMNIST' --model_name='CNN_MC_RMNIST' --uns_type='MC' --algs PLBB PBALD Rand LBB BALD BB MaxProb --random_seeds 42 227 346 684 920 --acq_batch_size=10 --num_init_samples=20 --max_train_samples=500
 ```
-@misc{kirsch2019batchbald,
-    title={BatchBALD: Efficient and Diverse Batch Acquisition for Deep Bayesian Active Learning},
-    author={Andreas Kirsch and Joost van Amersfoort and Yarin Gal},
-    year={2019},
-    eprint={1906.08158},
-    archivePrefix={arXiv},
-    primaryClass={cs.LG}
+
+RCIFAR-100 with deep ensembles:
+```sh
+python epochs_train.py --dataset='RCIFAR10' --model_name='ResNet-18' --optimizer_name='SGD' --uns_type='ENS' --algs PLBB PBALD Rand LBB BALD MaxProb --random_seeds 42 227 346 684 920 --acq_batch_size=100 --train_batch_size=100 --num_init_samples=2000 --max_train_samples=10000 --num_epochs=50
+```
+
+## Experimental setup
+Uncertainty estimation options: MC-dropout and deep ensembles. 
+
+Available active learning algorithms: 
+- [BALD](https://arxiv.org/abs/1112.5745)
+- [PowerBALD](https://arxiv.org/abs/2101.03552)
+- [BatchBALD](https://arxiv.org/abs/1906.08158)
+- Large BatchBALD (ours)
+- Power Large BatchBALD (ours)
+- [MaxProb](https://arxiv.org/abs/cmp-lg/9407020)
+- Entropy sampling
+- Random sampling
+
+Datasets:
+- MNIST-based: MNIST, RMNIST, FMNIST, EMNIST, KMNIST
+- CIFAR-based: CIFAR-10, CIFAR-100, RCIFAR-10, RCIFAR-100 
+- Others: SVHN, AG News (text)
+
+## Citation
+```
+@article{rubashevskii2023sbadbal,
+  title={Scalable Batch Acquisition for Deep Bayesian Active Learning},
+  author={Rubashevskii, Aleksandr and Kotova, Daria and Panov, Maxim},
+  journal={arXiv preprint arXiv:2301.05490},
+  year={2023}
 }
 ```
 
-## How to use
-
-We provide a simple example experiment that uses this package [here](https://blackhc.github.io/batchbald_redux/example_experiment/). 
-
-To get a candidate batch using BatchBALD, we provide a simple API in [`batchbald_redux.batchbald`](https://blackhc.github.io/batchbald_redux/batchbald/):
-
-
-<h4 id="get_batchbald_batch" class="doc_header"><code>get_batchbald_batch</code><a href="https://github.com/blackhc/batchbald_redux/tree/master/batchbald_redux/batchbald.py#L67" class="source_link" style="float:right">[source]</a></h4>
-
-> <code>get_batchbald_batch</code>(**`log_probs_N_K_C`**:`Tensor`, **`batch_size`**:`int`, **`num_samples`**:`int`, **`dtype`**=*`None`*, **`device`**=*`None`*)
-
-
-
-
-We also provide a simple implementation of consistent MC dropout in [`batchbald_redux.consistent_mc_dropout`](https://blackhc.github.io/batchbald_redux/consistent_mc_dropout/).
+Big thanks to [**batchbald_redux**](https://github.com/BlackHC/batchbald_redux), our code is partially borrowing from them.
