@@ -24,7 +24,6 @@ import torchvision
 from batchbald_redux import (
     progr_active_learning as active_learning,
     batchbald,
-    consistent_mc_dropout,
     joint_entropy,
     repeated_mnist,
     emnist,
