@@ -1,5 +1,5 @@
 # Scalable Batch Acquisition for Deep Bayesian Active Learning
-This is a PyTorch implementation of the [SDM 2023](https://www.siam.org/conferences/cm/conference/sdm23) paper [Scalable Batch Acquisition for Deep Bayesian Active Learning](https://arxiv.org/abs/2301.05490). Our work present a new Bayesian active learning algorithm called Large BatchBALD (and its stochastic extension Power Large BatchBALD), which gives a well-grounded approximation to the [BatchBALD](https://arxiv.org/abs/1906.08158) method and aims to achieve comparable quality while being more computationally efficient.
+This is a PyTorch implementation of the [SDM 2023](https://www.siam.org/conferences/cm/conference/sdm23) paper [Scalable Batch Acquisition for Deep Bayesian Active Learning](https://arxiv.org/abs/2301.05490). Our work present a new Bayesian active learning algorithm called Large BatchBALD aka LBB (and its stochastic extension Power Large BatchBALD aka PLBB), which gives a well-grounded approximation to the [BatchBALD](https://arxiv.org/abs/1906.08158) method and aims to achieve comparable quality while being more computationally efficient.
 
 <p align="center"><img src="pics/ens_fmnist_batch10.png" width="400" /></p>
 
