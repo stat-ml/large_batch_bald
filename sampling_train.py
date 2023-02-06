@@ -41,22 +41,18 @@ from cnn_models import (
     CNN_ENS_CIFAR10
 )
 
-from utils import init_glorot, plot_graph
-# from pytorch_resnet_cifar10.resnet import resnet20
-
 parser = ArgumentParser()
 parser.add_argument('--dataset_name', type=str, default='MNIST')
-# parser.add_argument('--dataset_names', nargs='+', type=str, default=['CIFAR100', 'CIFAR10', 'EMNIST', 'FMNIST', 'SVHN', 'RMNIST', 'MNIST'])
 parser.add_argument('--model_name', type=str, default='CNN_ENS_RMNIST')
 parser.add_argument('--optimizer_name', type=str, default='Adam')
 parser.add_argument('--uns_type', type=str, default='ENS')
 parser.add_argument('--algs', nargs='+', type=str, default=['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB'])
-parser.add_argument('--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920]) # 42, 227, 346, 684, 920 
+parser.add_argument('--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920])
 parser.add_argument('--num_models', type=int, default=10)
 parser.add_argument('--num_init_samples', type=int, default=200)
 parser.add_argument('--max_train_samples', type=int, default=10000)
 parser.add_argument('--acq_batch_size', type=int, default=100)
-parser.add_argument('--train_batch_size', type=int, default=64) # 64
+parser.add_argument('--train_batch_size', type=int, default=64)
 parser.add_argument('--pool_batch_size', type=int, default=128)
 parser.add_argument('--test_batch_size', type=int, default=512)
 parser.add_argument('--num_train_inference_samples', type=int, default=100)
@@ -330,13 +326,12 @@ for random_seed in random_seeds:
             if len(active_learning_data.training_dataset) >= max_training_samples:
                 break
 
-            # Acquire pool predictions # = pred from selected pool
+            # Acquire pool predictions
             N = len(active_learning_data.pool_dataset)
             if uns_type == 'MC':
                 logits_N_K_C = torch.empty((N, num_train_inference_samples, num_classes), dtype=torch.double, pin_memory=use_cuda)
             elif uns_type == 'ENS':
                 logits_N_K_C = torch.empty((N, T, num_classes), dtype=torch.double, pin_memory=use_cuda)
-        #     print("logits_N_K_C.size():", logits_N_K_C.size())
 
             with torch.no_grad():
                 model.eval()
@@ -375,11 +370,7 @@ for random_seed in random_seeds:
                         logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device
                     )
                 elif alg == 'Rand':
-#                     candidate_batch = batchbald.get_random_batch(
-#                         logits_N_K_C, acquisition_batch_size, dtype=torch.double, device=device
-#                     )
                     candiate_scores, candidate_indices = np.random.randn(acquisition_batch_size), active_learning_data.get_random_pool_indices(acquisition_batch_size)
-#                     np.random.choice(active_learning_data.pool_dataset.indices, acquisition_batch_size)
                     candidate_batch = CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
                 elif alg == 'PLBB': 
                     candidate_batch = batchbald.get_powerlbb_batch(
@@ -414,4 +405,3 @@ for random_seed in random_seeds:
             active_learning_data.acquire(candidate_batch.indices)
             added_indices.append(dataset_indices)
             pbar.update(len(dataset_indices))
-#     plot_graph(algs, uns_type, dataset_name, acquisition_batch_size, random_seed, num_initial_samples, max_training_samples)

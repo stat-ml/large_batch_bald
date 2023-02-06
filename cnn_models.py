@@ -97,26 +97,6 @@ class CNN_ENS_EMNIST(nn.Module):
         input = F.log_softmax(input, dim=1)
         return input
     
-# model = nn.Sequential( # (batch_size, 3, 32, 32)
-#         nn.Conv2d(3, 32, kernel_size=3), # (batch_size, 32, 30, 30)
-#         nn.ReLU(inplace=True),
-#         nn.Dropout(p=0.25),
-#         nn.Conv2d(32, 32, kernel_size=3), # (batch_size, 32, 28, 28)
-#         nn.ReLU(inplace=True),
-#         nn.Dropout(p=0.25),
-#         nn.MaxPool2d(kernel_size=2), # (batch_size, 64, 14, 14)
-#         nn.Conv2d(32, 64, kernel_size=3), # (batch_size, 64, 12, 12)
-#         nn.ReLU(inplace=True),
-#         nn.Dropout(p=0.25),
-#         nn.Conv2d(64, 64, kernel_size=3), # (batch_size, 64, 10, 10)
-#         nn.ReLU(inplace=True),
-#         nn.Dropout(p=0.25),
-#         nn.MaxPool2d(kernel_size=2), # (batch_size, 64, 5, 5)
-#         nn.Flatten(), # (batch_size, 64*5*5)
-#         nn.Dropout(p=0.5),
-#         nn.Linear(64*5*5, 10), # (batch_size, )
-#         )
-    
 class CNN_ENS_CIFAR10(nn.Module):
     def __init__(self, num_classes=10):
         super().__init__()

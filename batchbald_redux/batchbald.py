@@ -204,18 +204,6 @@ def get_lbb_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, de
 
     return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
 
-def get_random_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None) -> CandidateBatch:
-    N, K, C = log_probs_N_K_C.shape
-    
-    batch_size = min(batch_size, N)
-    
-    candidate_indices = []
-    candidate_scores = []
-
-    candiate_scores, candidate_indices = torch.rand(batch_size), torch.multinomial(torch.range(0, N, 1), num_samples=batch_size, replacement=False)
-
-    return CandidateBatch(candiate_scores.tolist(), candidate_indices.tolist())
-
 def get_powerlbb_batch(log_probs_N_K_C: torch.Tensor, batch_size: int, dtype=None, device=None, alpha=None) -> CandidateBatch:
     N, K, C = log_probs_N_K_C.shape
 
