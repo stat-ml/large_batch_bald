@@ -239,25 +239,17 @@ for random_seed in random_seeds:
                     model = CNN_ENS_RMNIST(num_classes).to(device=device)
                 elif model_name == 'ResNet-18':
                     model = torchvision.models.resnet18(pretrained=False, num_classes=num_classes).to(device=device)
-#                     append_dropout(model) ###
-#                     model = torchvision.models.resnet152(pretrained=False, num_classes=num_classes).to(device=device)
                 elif model_name == 'ResNet-20':
                     model = resnet20().to(device=device)
                 elif model_name == 'VGG-16':
                     model = torchvision.models.vgg16(pretrained=False, num_classes=num_classes).to(device=device)
                 elif model_name == 'DenseNet-121':
-#                     model = torchvision.models.densenet121(growth_rate=12, pretrained=False, num_classes=num_classes, drop_rate=0.2).to(device=device)
                     model = torchvision.models.densenet121(pretrained=False, num_classes=num_classes, drop_rate=args.dropout_rate).to(device=device)
                 model.apply(init_glorot)
                 if optimizer_name == 'Adam':
-                    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr) # 0.001
-#                     optimizer = torch.optim.Adam(model.parameters(), 0.01, weight_decay=1e-4)
-#                     sched = torch.optim.lr_scheduler.OneCycleLR(optimizer, 0.01, epochs=epochs, 
-#                                                 steps_per_epoch=len(train_loader))
+                    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
                 elif optimizer_name == 'SGD':
-#                     optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
-                    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0005) #
-#                     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+                    optimizer = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=0.9, weight_decay=0.0005)
                 
                 patience = 0
                 prev_loss = 10e8
