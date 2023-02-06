@@ -1,5 +1,5 @@
 # Scalable Batch Acquisition for Deep Bayesian Active Learning
-This is a PyTorch implementation of the [SDM 2023](https://www.siam.org/conferences/cm/conference/sdm23) paper [Scalable Batch Acquisition for Deep Bayesian Active Learning](https://arxiv.org/abs/2301.05490). Our work present a novel bayesian active learning algorithm called Large BatchBALD (and its stochastic extension Power Large BatchBALD), which gives a well-grounded approximation to the [BatchBALD](https://arxiv.org/abs/1906.08158) method and aims to achieve comparable quality while being more computationally efficient.
+This is a PyTorch implementation of the [SDM 2023](https://www.siam.org/conferences/cm/conference/sdm23) paper [Scalable Batch Acquisition for Deep Bayesian Active Learning](https://arxiv.org/abs/2301.05490). Our work present a new Bayesian active learning algorithm called Large BatchBALD (and its stochastic extension Power Large BatchBALD), which gives a well-grounded approximation to the [BatchBALD](https://arxiv.org/abs/1906.08158) method and aims to achieve comparable quality while being more computationally efficient.
 
 ## Install
 `pip install batchbald_redux`
@@ -22,8 +22,8 @@ Available active learning algorithms:
 - [BALD](https://arxiv.org/abs/1112.5745)
 - [PowerBALD](https://arxiv.org/abs/2101.03552)
 - [BatchBALD](https://arxiv.org/abs/1906.08158)
-- Large BatchBALD (ours)
-- Power Large BatchBALD (ours)
+- Large BatchBALD (Ours)
+- Power Large BatchBALD (Ours)
 - [MaxProb](https://arxiv.org/abs/cmp-lg/9407020)
 - Entropy sampling
 - Random sampling
@@ -43,4 +43,4 @@ Datasets:
 }
 ```
 
-Big thanks to [**batchbald_redux**](https://github.com/BlackHC/batchbald_redux), our code is partially borrowing from them.
+Big thanks to [**batchbald_redux**](https://github.com/BlackHC/batchbald_redux), our code is partially borrowed from them.
