@@ -40,7 +40,6 @@ class TransformedDataset(data.Dataset):
 
 
 def create_KMNIST_dataset():
-    # num_classes = 10, input_size = 28
 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5), (0.5))])
 

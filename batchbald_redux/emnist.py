@@ -40,27 +40,14 @@ class TransformedDataset(data.Dataset):
 
 
 def create_EMNIST_dataset():
-    transform = transforms.Compose([# transforms.ToTensor(),
-#                                     transforms.ToPILImage(),
-#                                     transforms.RandomCrop(24),
-                                    transforms.ToTensor(),
-#                                     transforms.RandomCrop(24), 
-#                                     transforms.RandomHorizontalFlip(p=0.3),
-#                                     transforms.RandomResizedCrop(24, scale=(0.675, 1.0)),
-#                                     transforms.Normalize((0.5), (0.5))
+    transform = transforms.Compose([transforms.ToTensor(),
                                     transforms.Normalize((0.1307), (0.3081))
-#                                     transforms.ToPILImage(),
-#                                     transforms.RandomCrop(24),
                                    ])
 
     train_dataset = datasets.EMNIST("emnist_data", split="balanced", train=True, download=True, transform=transform)
     test_dataset = datasets.EMNIST("emnist_data", split="balanced", train=False, transform=transform)
 
     return train_dataset, test_dataset
-
-
-def create_MNIST_dataset():
-    return create_repeated_MNIST(num_repetitions=1, add_noise=False)
 
 
 def get_targets(dataset):

@@ -40,7 +40,6 @@ class TransformedDataset(data.Dataset):
 
 
 def create_FashionMNIST_dataset():
-    # num_classes = 10, input_size = 28
 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.286), (0.353))])
 

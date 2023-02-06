@@ -53,12 +53,6 @@ def create_CIFAR100_dataset():
     
     train_dataset = datasets.CIFAR100("data", train=True, download=True, transform=train_tfms)
     test_dataset = datasets.CIFAR100("data", train=False, transform=valid_tfms)
-    
-#     transform = transforms.Compose([transforms.ToTensor(),
-#                                 transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762))])                              
-
-#     train_dataset = datasets.CIFAR100("data", train=True, download=True, transform=transform)
-#     test_dataset = datasets.CIFAR100("data", train=False, transform=transform)
 
     return train_dataset, test_dataset
 
