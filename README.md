@@ -20,9 +20,9 @@ python epochs_train.py --dataset='RCIFAR10' --model_name='ResNet-18' --optimizer
 ## Experimental setup
 All code related to the BALD and BatchBALD algorithms and the corresponding modules are taken from the [**batchbald_redux**](https://github.com/BlackHC/batchbald_redux) repository.
 All datasets and implemented algorithms are placed in the `batchbald_redux/` directory. 
+Train-evaluation files are placed in the main directory, results are saved in the `results/` directory with the corresponding config.
 Several training options are available: sample-wise training via `sampling_train.py` and regular epoch-wise training via `epochs_train.py`.
-Train-evaluation files are placed in the main directory.
-There are also several options for uncertainty estimation: MC-dropout and deep ensembles (available through the training arguments). 
+There are also several options for uncertainty estimation: MC-dropout and deep ensembles (available through the training arguments).
 
 Available active learning algorithms: 
 - [BALD](https://arxiv.org/abs/1112.5745)
