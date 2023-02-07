@@ -20,6 +20,7 @@ from typing import List
 import torch
 from torch.nn import functional as F
 import torchvision
+from utils import init_glorot
 
 from batchbald_redux import (
     progr_active_learning as active_learning,
