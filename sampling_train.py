@@ -42,24 +42,24 @@ from cnn_models import (
 )
 
 parser = ArgumentParser()
-parser.add_argument('--dataset_name', type=str, default='MNIST')
-parser.add_argument('--model_name', type=str, default='CNN_ENS_RMNIST')
-parser.add_argument('--optimizer_name', type=str, default='Adam')
-parser.add_argument('--uns_type', type=str, default='ENS')
-parser.add_argument('--algs', nargs='+', type=str, default=['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB'])
-parser.add_argument('--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920])
-parser.add_argument('--num_models', type=int, default=10)
-parser.add_argument('--num_init_samples', type=int, default=200)
-parser.add_argument('--max_train_samples', type=int, default=10000)
-parser.add_argument('--acq_batch_size', type=int, default=100)
-parser.add_argument('--train_batch_size', type=int, default=64)
-parser.add_argument('--pool_batch_size', type=int, default=128)
-parser.add_argument('--test_batch_size', type=int, default=512)
-parser.add_argument('--num_train_inference_samples', type=int, default=100)
-parser.add_argument('--num_test_inference_samples', type=int, default=5)
-parser.add_argument('--num_samples', type=int, default=100000)
-parser.add_argument('--training_iterations', type=int, default=24576) # 4096*6
-parser.add_argument('--cuda_number', type=int, default=0)
+parser.add_argument('--dataset_name', type=str, default='MNIST') # name of the dataset
+parser.add_argument('--model_name', type=str, default='CNN_ENS_RMNIST') #  name of the base model
+parser.add_argument('--optimizer_name', type=str, default='Adam') # name of the optimizer
+parser.add_argument('--uns_type', type=str, default='ENS') # type of uncertainty estimation (‘MC’ or ‘ENS’)
+parser.add_argument('--algs', nargs='+', type=str, default=['PLBB', 'PBALD', 'Rand', 'LBB', 'BALD', 'BB']) # AL algorithms
+parser.add_argument('--random_seeds', nargs='+', type=int, default=[42, 227, 346, 684, 920]) # random seeds
+parser.add_argument('--num_models', type=int, default=10) # number of models in the ensemble
+parser.add_argument('--num_init_samples', type=int, default=200) # initial number of training samples
+parser.add_argument('--max_train_samples', type=int, default=10000) # maximum number of training samples
+parser.add_argument('--acq_batch_size', type=int, default=100) # AL single step batch size
+parser.add_argument('--train_batch_size', type=int, default=64) # train batch size
+parser.add_argument('--pool_batch_size', type=int, default=128) # pool batch size
+parser.add_argument('--test_batch_size', type=int, default=512) # test batch size
+parser.add_argument('--num_train_inference_samples', type=int, default=100) # number of inference samples on train
+parser.add_argument('--num_test_inference_samples', type=int, default=5) # number of inference samples on test
+parser.add_argument('--num_samples', type=int, default=100000) # (BB approx param) total number of samples
+parser.add_argument('--training_iterations', type=int, default=24576) # number of training iterations
+parser.add_argument('--cuda_number', type=int, default=0) # Id of GPU
 args = parser.parse_args()
 
 dataset_name = args.dataset_name
