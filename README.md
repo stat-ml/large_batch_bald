@@ -6,7 +6,7 @@ This is a PyTorch implementation of the [SDM 2023](https://www.siam.org/conferen
 ## Install
 `pip install batchbald_redux`
 
-## Train examples
+## Train-evaluation examples
 FMNIST with MC-dropout:
 ```sh
 python sampling_train.py --dataset_name='FMNIST' --model_name='CNN_MC_RMNIST' --uns_type='MC' --algs PLBB PBALD Rand LBB BALD BB MaxProb --random_seeds 42 227 346 684 920 --acq_batch_size=10 --num_init_samples=20 --max_train_samples=500
