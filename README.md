@@ -12,7 +12,7 @@ FMNIST with MC-dropout:
 python sampling_train.py --dataset_name='FMNIST' --model_name='CNN_MC_RMNIST' --uns_type='MC' --algs PLBB PBALD Rand LBB BALD BB MaxProb --random_seeds 42 227 346 684 920 --acq_batch_size=10 --num_init_samples=20 --max_train_samples=500
 ```
 
-RCIFAR-100 with deep ensembles:
+RCIFAR-10 with deep ensembles:
 ```sh
 python epochs_train.py --dataset='RCIFAR10' --model_name='ResNet-18' --optimizer_name='SGD' --uns_type='ENS' --algs PLBB PBALD Rand LBB BALD MaxProb --random_seeds 42 227 346 684 920 --acq_batch_size=100 --train_batch_size=100 --num_init_samples=2000 --max_train_samples=10000 --num_epochs=50
 ```
